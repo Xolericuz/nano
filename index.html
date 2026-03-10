@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XOLƎRIƆ Dashboard</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0d0d12">
+    <style>
+        :root {
+            --bg-color: #08080b;
+            --panel-bg: #121218;
+            --neon-accent: #00ffcc;
+            --text-main: #e0e0e0;
+            --text-muted: #7a7a8c;
+            --border-color: #2a2a35;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Courier New', Courier, monospace; }
+        body { background-color: var(--bg-color); color: var(--text-main); overflow-x: hidden; }
+        
+        /* Yuqori qism */
+        header {
+            padding: 20px 30px;
+            background: rgba(18, 18, 24, 0.8);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .logo { font-size: 28px; font-weight: bold; color: var(--neon-accent); letter-spacing: 3px; text-shadow: 0 0 10px rgba(0, 255, 204, 0.3); }
+        .controls button {
+            background: transparent; border: 1px solid var(--neon-accent);
+            color: var(--neon-accent); padding: 10px 20px; border-radius: 4px;
+            cursor: pointer; transition: all 0.3s ease; font-weight: bold; text-transform: uppercase;
+        }
+        .controls button:hover { background: var(--neon-accent); color: #000; box-shadow: 0 0 15px rgba(0, 255, 204, 0.4); }
+
+        /* Asosiy ish stoli (Grid) */
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 25px;
+            padding: 30px;
+            min-height: 80vh;
+            align-items: start;
+        }
+
+        /* Panellar */
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 20px;
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s;
+            cursor: grab;
+            display: flex;
+            flex-direction: column;
+            animation: fadeIn 0.4s ease-out forwards;
+            position: relative;
+        }
+        .panel:hover { border-color: #444455; }
+        .panel:active { cursor: grabbing; transform: scale(0.98); }
+        .panel.dragging { opacity: 0.4; border: 1px dashed var(--neon-accent); }
+        
+        .panel-header {
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 15px;
+        }
+        
+        /* Matnni saytni o'zida tahrirlash */
+        .panel-title {
+            font-size: 16px; font-weight: bold; color: #fff;
+            outline: none; padding: 4px 8px; border-radius: 4px; border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+        .panel-title:focus { background: #1a1a24; border: 1px solid var(--neon-accent); color: var(--neon-accent); }
+        
+        .panel-content { flex-grow: 1; color: var(--text-muted); font-size: 14px; line-height: 1.6; }
+        .delete-btn { color: #ff3366; cursor: pointer; font-size: 20px; border: none; background: none; transition: 0.2s; }
+        .delete-btn:hover { text-shadow: 0 0 8px rgba(255, 51, 102, 0.6); transform: scale(1.1); }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">XOLƎRIƆ</div>
+        <div class="controls">
+            <button onclick="Core.addPanel('Yangi Modul', 'Yangi yadro moduli ulandi...')">+ Yadroga qo'shish</button>
+        </div>
+    </header>
+
+    <div class="dashboard" id="dashboard">
+        </div>
+
+    <script>
+        /**
+         * GLOBAL YADRO ARXITEKTURASI
+         * Istalgancha yangi fayl yoki funksiyani Core.register() orqali ulash mumkin.
+         */
+        window.Core = {
+            container: document.getElementById('dashboard'),
+            modules: {}, // Tashqi fayllarni yig'uvchi obyekt
+            draggedItem: null,
+
+            init() {
+                this.setupPWA();
+                // Boshlang'ich panellarni yuklash
+                this.addPanel('GitHub Panel', 'Repozitoriy va kodlar holati. \nStatus: Ulanish kutilmoqda...');
+                this.addPanel('Telegram Bot Panel', 'Xabarlar va buyruqlar oqimi. \nStatus: Ulanish kutilmoqda...');
+            },
+
+            // Tashqi JS fayllarni yadroga ulash darchasi
+            register(moduleName, moduleFunction) {
+                this.modules[moduleName] = moduleFunction;
+                console.log(`[Yadro]: "${moduleName}" tizimga ulandi.`);
+                moduleFunction(this); // Modulga yadroni uzatish
+            },
+
+            // Vizual panel qo'shish logikasi
+            addPanel(title, contentStr) {
+                const panel = document.createElement('div');
+                panel.className = 'panel';
+                panel.draggable = true;
+
+                panel.innerHTML = `
+                    <div class="panel-header">
+                        <span class="panel-title" contenteditable="true" spellcheck="false" title="Nomini o'zgartirish uchun bosing">${title}</span>
+                        <button class="delete-btn" onclick="this.parentElement.parentElement.remove()" title="O'chirish">&times;</button>
+                    </div>
+                    <div class="panel-content"><pre style="white-space: pre-wrap;">${contentStr}</pre></div>
+                `;
+
+                this.attachDragEvents(panel);
+                this.container.appendChild(panel);
+            },
+
+            // Joylashuvni o'zgartirish (Drag & Drop)
+            attachDragEvents(item) {
+                item.addEventListener('dragstart', function(e) {
+                    Core.draggedItem = this;
+                    setTimeout(() => this.classList.add('dragging'), 0);
+                });
+
+                item.addEventListener('dragend', function() {
+                    this.classList.remove('dragging');
+                    Core.draggedItem = null;
+                });
+
+                this.container.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    const afterElement = Core.getDragAfterElement(this, e.clientX, e.clientY);
+                    const draggable = document.querySelector('.dragging');
+                    if (afterElement == null) {
+                        this.appendChild(draggable);
+                    } else {
+                        this.insertBefore(draggable, afterElement);
+                    }
+                });
+            },
+
+            // Qaysi elementdan keyin tushishini hisoblash
+            getDragAfterElement(container, x, y) {
+                const draggableElements = [...container.querySelectorAll('.panel:not(.dragging)')];
+                return draggableElements.reduce((closest, child) => {
+                    const box = child.getBoundingClientRect();
+                    const offsetX = x - box.left - box.width / 2;
+                    const offsetY = y - box.top - box.height / 2;
+                    
+                    // Element qator va ustun markaziga qarab hisoblanadi
+                    if (offsetX < 0 && offsetY < 0 && offsetX > closest.offset) {
+                        return { offset: offsetX, element: child };
+                    } else {
+                        return closest;
+                    }
+                }, { offset: Number.NEGATIVE_INFINITY }).element;
+            },
+
+            // PWA ni ulash
+            setupPWA() {
+                if ('serviceWorker' in navigator) {
+                    window.addEventListener('load', () => {
+                        navigator.serviceWorker.register('./sw.js')
+                            .then(reg => console.log('[Yadro]: Service Worker aktiv.', reg.scope))
+                            .catch(err => console.error('[Yadro xatosi]:', err));
+                    });
+                }
+            }
+        };
+
+        // Dasturni ishga tushirish
+        document.addEventListener('DOMContentLoaded', () => Core.init());
+    </script>
+</body>
+</html>
